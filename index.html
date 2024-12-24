@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Haircut Preferences Prototype</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            position: relative;
+        }
+
+        h1 {
+            margin-bottom: 10px;
+        }
+
+        p {
+            margin-bottom: 20px;
+        }
+
+        .views {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .container {
+            position: relative;
+            display: inline-block;
+        }
+
+        img {
+            max-width: 300px;
+            width: 100%;
+            height: auto;
+            display: block;
+            border: 1px solid #ccc;
+        }
+
+        .dot {
+            width: 15px;
+            height: 15px;
+            background-color: red;
+            border-radius: 50%;
+            position: absolute;
+            transform: translate(-50%, -50%);
+            cursor: pointer;
+        }
+
+        .popup {
+            position: absolute;
+            background: #fff;
+            border: 1px solid #ccc;
+            padding: 10px;
+            width: 200px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            display: none; /* Hidden by default */
+            box-sizing: border-box;
+            z-index: 1000; /* ensure popup is above everything */
+        }
+
+        .popup textarea {
+            width: 100%;
+            height: 50px;
+            font-family: Arial, sans-serif;
+            box-sizing: border-box;
+        }
+
+        .popup .button-row {
+            margin-top: 5px;
+        }
+
+        .popup button {
+            margin-right: 5px;
+        }
+
+        #deleteDotBtn {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            background: none;
+            border: none;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 16px;
+            line-height: 16px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Haircut Preferences Prototype</h1>
+    <p>
+        Click on any image (front, side, back) to create a new dot.<br>
+        Click a dot to edit, clear, or delete it.<br>
+        Comments and positions are saved in localStorage.<br>
+        **Note:** For Chrome, access this page via a local server (e.g., http://localhost:8000/index.html).
+    </p>
+
+    <div class="views">
+        <!-- Front View -->
+        <div class="container" id="frontContainer">
+            <img src="head.png" alt="Front View" id="frontImage"/>
+        </div>
+
+        <!-- Side View -->
+        <div class="container" id="sideContainer">
+            <img src="side.png" alt="Side View" id="sideImage"/>
+        </div>
+
+        <!-- Back View -->
+        <div class="container" id="backContainer">
+            <img src="back.png" alt="Back View" id="backImage"/>
+        </div>
+    </div>
+
+    <div class="popup" id="popup">
+        <button id="deleteDotBtn">X</button>
+        <textarea id="commentText" placeholder="Enter your comment"></textarea><br>
+        <div class="button-row">
+            <button id="saveBtn">Save</button>
+            <button id="clearBtn">Clear</button>
+            <button id="closeBtn">Close</button>
+        </div>
+    </div>
+
+    <script>
+        const frontContainer = document.getElementById('frontContainer');
+        const sideContainer = document.getElementById('sideContainer');
+        const backContainer = document.getElementById('backContainer');
+
+        const popup = document.getElementById('popup');
+        const commentText = document.getElementById('commentText');
+        const saveBtn = document.getElementById('saveBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const closeBtn = document.getElementById('closeBtn');
+        const deleteDotBtn = document.getElementById('deleteDotBtn');
+
+        let dotsData = [];
+        let currentDotIndex = null;
+
+        const containers = {
+            front: frontContainer,
+            side: sideContainer,
+            back: backContainer
+        };
+
+        // Load dots from localStorage
+        const storedData = localStorage.getItem('dotsData');
+        if (storedData) {
+            dotsData = JSON.parse(storedData);
+            dotsData.forEach((dot, index) => {
+                const container = containers[dot.view];
+                if (container) createDotElement(dot.x, dot.y, index, container);
+            });
+        }
+
+        frontContainer.addEventListener('click', (event) => handleContainerClick(event, 'front'));
+        sideContainer.addEventListener('click', (event) => handleContainerClick(event, 'side'));
+        backContainer.addEventListener('click', (event) => handleContainerClick(event, 'back'));
+
+        function handleContainerClick(event, view) {
+            if (popup.contains(event.target)) return;
+
+            // If clicked a dot
+            if (event.target.classList.contains('dot')) {
+                currentDotIndex = parseInt(event.target.getAttribute('data-index'), 10);
+                showPopupForDot(currentDotIndex);
+            } else {
+                // Create new dot
+                const containerRect = containers[view].getBoundingClientRect();
+                // Include scroll offsets
+                const clickX = event.clientX - containerRect.left + window.scrollX;
+                const clickY = event.clientY - containerRect.top + window.scrollY;
+
+                const newDot = { x: clickX, y: clickY, comment: '', view: view };
+                dotsData.push(newDot);
+                const newIndex = dotsData.length - 1;
+
+                createDotElement(clickX, clickY, newIndex, containers[view]);
+                currentDotIndex = newIndex;
+                showPopupForDot(currentDotIndex);
+                saveDotsToLocalStorage();
+            }
+        }
+
+        function createDotElement(x, y, index, container) {
+            const dot = document.createElement('div');
+            dot.className = 'dot';
+            dot.style.top = y + 'px';
+            dot.style.left = x + 'px';
+            dot.setAttribute('data-index', index);
+            container.appendChild(dot);
+        }
+
+        function showPopupForDot(index) {
+            const dot = dotsData[index];
+            commentText.value = dot.comment;
+
+            const container = containers[dot.view];
+            const dotElements = container.querySelectorAll('.dot');
+            const dotElement = Array.from(dotElements).find(d => parseInt(d.getAttribute('data-index'), 10) === index);
+
+            if (!dotElement) return;
+
+            const dotRect = dotElement.getBoundingClientRect();
+            const containerRect = container.getBoundingClientRect();
+
+            // Calculate position relative to container + scroll offset
+            const topPos = (dotRect.top - containerRect.top) + window.scrollY + 20;
+            const leftPos = (dotRect.left - containerRect.left) + window.scrollX + 20;
+
+            // Set popup position
+            popup.style.top = topPos + 'px';
+            popup.style.left = leftPos + 'px';
+            popup.style.display = 'block';
+        }
+
+        function saveDotsToLocalStorage() {
+            localStorage.setItem('dotsData', JSON.stringify(dotsData));
+        }
+
+        saveBtn.addEventListener('click', () => {
+            if (currentDotIndex !== null) {
+                dotsData[currentDotIndex].comment = commentText.value.trim();
+                saveDotsToLocalStorage();
+                popup.style.display = 'none';
+            }
+        });
+
+        clearBtn.addEventListener('click', () => {
+            if (currentDotIndex !== null) {
+                dotsData[currentDotIndex].comment = '';
+                commentText.value = '';
+                saveDotsToLocalStorage();
+            }
+        });
+
+        closeBtn.addEventListener('click', () => {
+            popup.style.display = 'none';
+        });
+
+        deleteDotBtn.addEventListener('click', () => {
+            if (currentDotIndex !== null) {
+                const confirmation = confirm("Are you sure you want to delete this dot and its comment?");
+                if (confirmation) {
+                    dotsData.splice(currentDotIndex, 1);
+                    saveDotsToLocalStorage();
+                    reRenderAllDots();
+                    popup.style.display = 'none';
+                    currentDotIndex = null;
+                }
+            }
+        });
+
+        function reRenderAllDots() {
+            Object.values(containers).forEach(container => {
+                const existingDots = container.querySelectorAll('.dot');
+                existingDots.forEach(dot => dot.remove());
+            });
+
+            dotsData.forEach((dot, idx) => {
+                const container = containers[dot.view];
+                if (container) createDotElement(dot.x, dot.y, idx, container);
+            });
+        }
+
+        // Close popup if clicking outside
+        document.addEventListener('click', (event) => {
+            const dotClicked = event.target.classList.contains('dot');
+            const isClickInside = popup.contains(event.target);
+            const clickedOnContainer = event.target.closest('.container');
+
+            if (!isClickInside && !dotClicked && !clickedOnContainer) {
+                popup.style.display = 'none';
+            }
+        });
+    </script>
+</body>
+</html>
