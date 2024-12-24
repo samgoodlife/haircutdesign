@@ -94,7 +94,7 @@
         Click on any image (front, side, back) to create a new dot.<br>
         Click a dot to edit, clear, or delete it.<br>
         Comments and positions are saved in localStorage.<br>
-        **Note:** For Chrome, access this page via a local server (e.g., http://localhost:8000/index.html).
+        <strong>Note:</strong> For Chrome, access this page via a local server (e.g., http://localhost:8000/index.html).
     </p>
 
     <div class="views">
@@ -125,6 +125,9 @@
     </div>
 
     <script>
+        /* Hardcoded preSetDots array so these dots always appear. */
+        const preSetDots = JSON.parse(`[{"x":194,"y":99.625,"comment":"No razor"},{"x":300,"y":106.625,"comment":""},{"x":68,"y":136.625,"comment":""},{"x":142,"y":179.5625,"comment":"Keep Sideburn (Teddy) wide","view":"side"},{"x":230,"y":249.5625,"comment":"Don't trim the edge of mustache","view":"side"},{"x":148,"y":256.5625,"comment":"No blade lining, fade off","view":"back"},{"x":180,"y":97.5625,"comment":"Make sure this is straight","view":"side"},{"x":146,"y":399.5625,"comment":"Trim down beard a little to make it look neat.","view":"front"},{"x":120,"y":77.5625,"comment":"Don't use enhancer (Black spray)","view":"front"}]`);
+
         const frontContainer = document.getElementById('frontContainer');
         const sideContainer = document.getElementById('sideContainer');
         const backContainer = document.getElementById('backContainer');
@@ -136,6 +139,7 @@
         const closeBtn = document.getElementById('closeBtn');
         const deleteDotBtn = document.getElementById('deleteDotBtn');
 
+        // Used if you want to create or edit new dots (stored in localStorage).
         let dotsData = [];
         let currentDotIndex = null;
 
@@ -145,31 +149,62 @@
             back: backContainer
         };
 
-        // Load dots from localStorage
-        const storedData = localStorage.getItem('dotsData');
-        if (storedData) {
-            dotsData = JSON.parse(storedData);
-            dotsData.forEach((dot, index) => {
-                const container = containers[dot.view];
-                if (container) createDotElement(dot.x, dot.y, index, container);
+        /* 1) Draw the preSetDots array automatically on page load. */
+        function createPreSetDots() {
+          preSetDots.forEach((dot, index) => {
+            let container;
+
+            if (dot.view === "front") container = frontContainer;
+            if (dot.view === "side") container = sideContainer;
+            if (dot.view === "back") container = backContainer;
+
+            // If no "view" is specified, skip or default to "front"
+            if (!container) return;
+
+            const dotElem = document.createElement('div');
+            dotElem.className = 'dot';
+            dotElem.style.position = 'absolute';
+            dotElem.style.top = `${dot.y}px`;
+            dotElem.style.left = `${dot.x}px`;
+            dotElem.style.width = '15px';
+            dotElem.style.height = '15px';
+            dotElem.style.backgroundColor = 'red';
+            dotElem.style.borderRadius = '50%';
+            dotElem.style.cursor = 'pointer';
+
+            // When clicking a preSet dot, show the comment in the popup near the dot.
+            dotElem.addEventListener('click', (event) => {
+              event.stopPropagation(); // avoid auto-closing
+              commentText.value = dot.comment || "";
+
+              // Position popup near the dot
+              const dotRect = dotElem.getBoundingClientRect();
+              const containerRect = container.getBoundingClientRect();
+
+              const topPos = (dotRect.top - containerRect.top) + window.scrollY + 20;
+              const leftPos = (dotRect.left - containerRect.left) + window.scrollX + 20;
+
+              popup.style.top = `${topPos}px`;
+              popup.style.left = `${leftPos}px`;
+              popup.style.display = 'block';
             });
+
+            container.appendChild(dotElem);
+          });
         }
 
-        frontContainer.addEventListener('click', (event) => handleContainerClick(event, 'front'));
-        sideContainer.addEventListener('click', (event) => handleContainerClick(event, 'side'));
-        backContainer.addEventListener('click', (event) => handleContainerClick(event, 'back'));
+        // Call createPreSetDots on load
+        window.addEventListener('DOMContentLoaded', createPreSetDots);
 
+        /* 2) The rest is existing code if you want new dots (stored in localStorage) */
         function handleContainerClick(event, view) {
             if (popup.contains(event.target)) return;
 
-            // If clicked a dot
             if (event.target.classList.contains('dot')) {
                 currentDotIndex = parseInt(event.target.getAttribute('data-index'), 10);
                 showPopupForDot(currentDotIndex);
             } else {
-                // Create new dot
                 const containerRect = containers[view].getBoundingClientRect();
-                // Include scroll offsets
                 const clickX = event.clientX - containerRect.left + window.scrollX;
                 const clickY = event.clientY - containerRect.top + window.scrollY;
 
@@ -183,6 +218,11 @@
                 saveDotsToLocalStorage();
             }
         }
+
+        // Attach container clicks
+        frontContainer.addEventListener('click', (event) => handleContainerClick(event, 'front'));
+        sideContainer.addEventListener('click', (event) => handleContainerClick(event, 'side'));
+        backContainer.addEventListener('click', (event) => handleContainerClick(event, 'back'));
 
         function createDotElement(x, y, index, container) {
             const dot = document.createElement('div');
@@ -206,11 +246,9 @@
             const dotRect = dotElement.getBoundingClientRect();
             const containerRect = container.getBoundingClientRect();
 
-            // Calculate position relative to container + scroll offset
             const topPos = (dotRect.top - containerRect.top) + window.scrollY + 20;
             const leftPos = (dotRect.left - containerRect.left) + window.scrollX + 20;
 
-            // Set popup position
             popup.style.top = topPos + 'px';
             popup.style.left = leftPos + 'px';
             popup.style.display = 'block';
